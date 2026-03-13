@@ -4,6 +4,7 @@ import type { ApartmentLayout, ApartmentType, RoomKind, RoomZone, WallItem } fro
 export const GRID_SIZE = 0.25;
 export const DEFAULT_WALL_THICKNESS = 0.14;
 export const EXTERIOR_WALL_THICKNESS = 0.22;
+export const DUPLEX_LEVEL_HEIGHT = 2.42;
 const ROTATION_STEP = 5;
 
 type RoomRect = {
@@ -15,6 +16,7 @@ type RoomRect = {
   z1: number;
   z2: number;
   color: string;
+  level?: 0 | 1;
 };
 
 type TemplateDefinition = {
@@ -31,6 +33,7 @@ type Edge = {
   start: number;
   end: number;
   kind: "exterior" | "partition";
+  level?: 0 | 1;
 };
 
 function rect(
@@ -42,8 +45,9 @@ function rect(
   z1: number,
   z2: number,
   color: string,
+  level: 0 | 1 = 0,
 ): RoomRect {
-  return { id, kind, label, x1, x2, z1, z2, color };
+  return { id, kind, label, x1, x2, z1, z2, color, level };
 }
 
 function roundCoord(value: number) {
@@ -85,7 +89,7 @@ export function normalizeWall(wall: WallItem, room: RoomDimensions): WallItem {
     length,
     height,
     thickness,
-    position: [x, height / 2, z],
+    position: [x, (wall.level === 1 ? DUPLEX_LEVEL_HEIGHT : 0) + height / 2, z],
   };
 }
 
@@ -97,6 +101,7 @@ function buildRoomZone(room: RoomRect): RoomZone {
     center: [roundCoord((room.x1 + room.x2) / 2), roundCoord((room.z1 + room.z2) / 2)],
     size: [roundCoord(room.x2 - room.x1), roundCoord(room.z2 - room.z1)],
     color: room.color,
+    level: room.level ?? 0,
   };
 }
 
@@ -106,7 +111,7 @@ function collectEdges(rooms: RoomRect[], room: RoomDimensions) {
   const edgeMap = new Map<string, Edge & { count: number }>();
 
   const pushEdge = (edge: Edge) => {
-    const key = `${edge.orientation}:${roundCoord(edge.line)}:${roundCoord(edge.start)}:${roundCoord(edge.end)}`;
+    const key = `${edge.level ?? 0}:${edge.orientation}:${roundCoord(edge.line)}:${roundCoord(edge.start)}:${roundCoord(edge.end)}`;
     const existing = edgeMap.get(key);
     if (existing) {
       existing.count += 1;
@@ -124,6 +129,7 @@ function collectEdges(rooms: RoomRect[], room: RoomDimensions) {
         start: roomRect.x1,
         end: roomRect.x2,
         kind: roundCoord(roomRect.z1) === roundCoord(-halfL) ? "exterior" : "partition",
+        level: roomRect.level ?? 0,
       },
       {
         orientation: "horizontal",
@@ -131,6 +137,7 @@ function collectEdges(rooms: RoomRect[], room: RoomDimensions) {
         start: roomRect.x1,
         end: roomRect.x2,
         kind: roundCoord(roomRect.z2) === roundCoord(halfL) ? "exterior" : "partition",
+        level: roomRect.level ?? 0,
       },
       {
         orientation: "vertical",
@@ -138,6 +145,7 @@ function collectEdges(rooms: RoomRect[], room: RoomDimensions) {
         start: roomRect.z1,
         end: roomRect.z2,
         kind: roundCoord(roomRect.x1) === roundCoord(-halfW) ? "exterior" : "partition",
+        level: roomRect.level ?? 0,
       },
       {
         orientation: "vertical",
@@ -145,6 +153,7 @@ function collectEdges(rooms: RoomRect[], room: RoomDimensions) {
         start: roomRect.z1,
         end: roomRect.z2,
         kind: roundCoord(roomRect.x2) === roundCoord(halfW) ? "exterior" : "partition",
+        level: roomRect.level ?? 0,
       },
     ];
 
@@ -158,7 +167,7 @@ function mergeEdges(edges: Array<Edge & { count: number }>) {
   const buckets = new Map<string, Edge[]>();
 
   edges.forEach((edge) => {
-    const key = `${edge.kind}:${edge.orientation}:${roundCoord(edge.line)}`;
+    const key = `${edge.kind}:${edge.orientation}:${roundCoord(edge.line)}:${edge.level ?? 0}`;
     const list = buckets.get(key) ?? [];
     list.push(edge);
     buckets.set(key, list);
@@ -167,7 +176,7 @@ function mergeEdges(edges: Array<Edge & { count: number }>) {
   const merged: Edge[] = [];
 
   for (const [key, list] of buckets) {
-    const [kind, orientation, line] = key.split(":") as ["exterior" | "partition", "horizontal" | "vertical", string];
+    const [kind, orientation, line, level] = key.split(":") as ["exterior" | "partition", "horizontal" | "vertical", string, string];
     const sorted = list
       .map((item) => ({ ...item, start: Math.min(item.start, item.end), end: Math.max(item.start, item.end) }))
       .sort((a, b) => a.start - b.start);
@@ -179,12 +188,12 @@ function mergeEdges(edges: Array<Edge & { count: number }>) {
       if (next.start <= current.end + 0.001) {
         current.end = Math.max(current.end, next.end);
       } else {
-        merged.push({ orientation, line: Number(line), start: current.start, end: current.end, kind });
+        merged.push({ orientation, line: Number(line), start: current.start, end: current.end, kind, level: Number(level) as 0 | 1 });
         current = { ...next };
       }
     }
 
-    merged.push({ orientation, line: Number(line), start: current.start, end: current.end, kind });
+    merged.push({ orientation, line: Number(line), start: current.start, end: current.end, kind, level: Number(level) as 0 | 1 });
   }
 
   return merged;
@@ -206,6 +215,7 @@ function edgeToWall(edge: Edge, room: RoomDimensions): WallItem {
         height: room.height,
         thickness: edge.kind === "exterior" ? EXTERIOR_WALL_THICKNESS : DEFAULT_WALL_THICKNESS,
         snap: GRID_SIZE,
+        level: edge.level ?? 0,
         locked: edge.kind === "exterior",
       },
       room,
@@ -222,6 +232,7 @@ function edgeToWall(edge: Edge, room: RoomDimensions): WallItem {
       height: room.height,
       thickness: edge.kind === "exterior" ? EXTERIOR_WALL_THICKNESS : DEFAULT_WALL_THICKNESS,
       snap: GRID_SIZE,
+      level: edge.level ?? 0,
       locked: edge.kind === "exterior",
     },
     room,
@@ -243,8 +254,9 @@ function item(
   position: [number, number, number],
   rotation: number,
   color: string,
+  level: 0 | 1 = 0,
 ): FurnitureItem {
-  return { id, name, width, height, depth, position, rotation, color };
+  return { id, name, width, height, depth, position, rotation, color, level };
 }
 
 function pendant(id: string, x: number, z: number, roomHeight: number, color = "#d9c1a3") {
@@ -276,6 +288,19 @@ function createDefaultFurniture(type: ApartmentType, room: RoomDimensions): Furn
         item("studio-bath-vanity", "Bathroom vanity", 0.9, 0.86, 0.48, [2.65, 0.43, 1.9], 0, "#ece7df"),
         item("studio-floorlamp", "Floor Lamp", 0.4, 1.7, 0.4, [-3.35, 0.85, -1.7], 0, "#d8ccb8"),
         pendant("studio-pendant", -0.75, -0.7, h),
+      ];
+    case "duplex":
+      return [
+        item("duplex-sofa", "Sofa", 2.8, 0.96, 1.05, [-2.9, 0.48, -1.35], 0, "#b8a59a", 0),
+        item("duplex-stairs", "Stair", 1.45, 2.45, 2.75, [0.35, 1.225, 1.65], 180, "#a67c52", 0),
+        item("duplex-kitchen-run", "Kitchen island", 2.6, 0.94, 0.82, [3.0, 0.47, -1.55], 0, "#c7b19c", 0),
+        item("duplex-dining", "Desk", 1.7, 0.76, 0.86, [2.3, 0.38, -0.05], 0, "#b28960", 0),
+        item("duplex-chair-a", "Chair", 0.5, 0.86, 0.5, [1.7, 0.43, 0.65], 180, "#d8d4cf", 0),
+        item("duplex-chair-b", "Chair", 0.5, 0.86, 0.5, [2.9, 0.43, 0.65], 180, "#d8d4cf", 0),
+        item("duplex-bed", "Bed", 1.8, 0.62, 2.2, [3.55, DUPLEX_LEVEL_HEIGHT + 0.31, 2.35], 0, "#dbcac0", 1),
+        item("duplex-desk", "Desk", 1.45, 0.76, 0.72, [1.25, DUPLEX_LEVEL_HEIGHT + 0.38, 2.35], 0, "#af8356", 1),
+        item("duplex-bath-vanity", "Bathroom vanity", 1.0, 0.86, 0.5, [-1.15, 0.43, 2.45], 0, "#efeae1", 0),
+        pendant("duplex-pendant", -2.2, -1.15, h, "#dfc7a7"),
       ];
     case "two-room":
       return [
@@ -400,6 +425,20 @@ const templates: Record<ApartmentType, TemplateDefinition> = {
     ],
     1.18,
     1.16,
+  ),
+  duplex: makeTemplate(
+    "duplex",
+    "Duplex mezzanine",
+    { width: 9.4, length: 6.4, height: 5.4 },
+    [
+      rect("duplex-living", "living-room", "Double-height living", -4.7, 0.7, -3.2, 0.3, "#d9e5ea", 0),
+      rect("duplex-kitchen", "kitchen", "Kitchen", 0.7, 4.7, -3.2, 0.3, "#e7ddd0", 0),
+      rect("duplex-entrance", "entrance", "Entrance", -4.7, -2.1, 0.3, 3.2, "#e8dfd4", 0),
+      rect("duplex-bathroom", "bathroom", "Bathroom", -2.1, 0.4, 0.3, 3.2, "#dbe2ef", 0),
+      rect("duplex-mezzanine", "mezzanine", "Mezzanine", 0.4, 4.7, 0.3, 3.2, "#eadce6", 1),
+    ],
+    1.06,
+    1.06,
   ),
   "two-room": makeTemplate(
     "two-room",

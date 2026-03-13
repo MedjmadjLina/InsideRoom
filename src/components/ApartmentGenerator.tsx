@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRoomStore } from "@/store/roomStore";
-import { getApartmentTemplate } from "@/lib/apartmentLayout";
+import { generateApartmentLayout, getApartmentTemplate } from "@/lib/apartmentLayout";
 import type { ApartmentType } from "@/types/apartment";
 
 const OPTIONS: Array<{
@@ -13,6 +13,7 @@ const OPTIONS: Array<{
   badge?: string;
 }> = [
   { type: "studio", label: "Studio", sub: "Living + Kitchen + Bath", mood: "Compact and efficient", badge: "Popular" },
+  { type: "duplex", label: "Duplex", sub: "Double height + Mezzanine + Bath", mood: "High ceiling with stair rhythm", badge: "New" },
   { type: "two-room", label: "2-room", sub: "Living + Bedroom + Bath", mood: "Balanced everyday plan", badge: "Easy start" },
   { type: "three-room", label: "3-room", sub: "Living + Kitchen + Bedroom + Bath", mood: "More separation, more rhythm" },
   { type: "four-room", label: "4-room", sub: "Living + Kitchen + 2 Bedrooms + Bath", mood: "Family-ready structure" },
@@ -21,65 +22,113 @@ const OPTIONS: Array<{
 ];
 
 function PlanPreview({ type }: { type: ApartmentType }) {
-  const template = getApartmentTemplate(type);
-  const maxWidth = template.room.width;
-  const maxLength = template.room.length;
+  const layout = useMemo(() => generateApartmentLayout(type), [type]);
+  const maxWidth = layout.room.width;
+  const maxLength = layout.room.length;
+  const inset = 18;
+  const innerWidth = `calc(100% - ${inset * 2}px)`;
+  const innerHeight = `calc(100% - ${inset * 2}px)`;
 
   return (
     <div
       className="relative h-40 w-full overflow-hidden rounded-[24px]"
       style={{
         background:
-          "linear-gradient(180deg, rgba(88,59,43,0.65), rgba(44,29,23,0.65))",
-        border: "1px solid rgba(255,234,211,0.12)",
-        boxShadow: "inset 0 1px 0 rgba(255,245,230,0.1)",
+          "linear-gradient(180deg, rgba(80,54,40,0.48), rgba(45,30,23,0.50))",
+        border: "1px solid rgba(255,234,211,0.10)",
+        boxShadow: "inset 0 1px 0 rgba(255,245,230,0.08)",
       }}
     >
       <div
         className="absolute inset-[12px] rounded-[18px]"
         style={{
-          background: "rgba(250,235,214,0.06)",
-          border: "1px solid rgba(255,234,211,0.09)",
+          background: "rgba(255,244,229,0.08)",
+          border: "1px solid rgba(255,234,211,0.08)",
         }}
       />
-      {template.rooms.map((room) => {
-        const previewRoom = room as {
-          id: string;
-          x1: number;
-          x2: number;
-          z1: number;
-          z2: number;
-          color: string;
-        };
-        const roomWidth = `${((previewRoom.x2 - previewRoom.x1) / maxWidth) * 100}%`;
-        const roomHeight = `${((previewRoom.z2 - previewRoom.z1) / maxLength) * 100}%`;
-        const left = `${((previewRoom.x1 + maxWidth / 2) / maxWidth) * 100}%`;
-        const top = `${((previewRoom.z1 + maxLength / 2) / maxLength) * 100}%`;
+      <div className="absolute inset-[12px] overflow-hidden rounded-[18px]">
+        <div
+          className="absolute rounded-[10px]"
+          style={{
+            left: inset,
+            top: inset,
+            width: innerWidth,
+            height: innerHeight,
+            background:
+              "linear-gradient(180deg, rgba(248,242,234,0.97), rgba(241,232,220,0.98))",
+            boxShadow: "0 1px 0 rgba(255,255,255,0.22), inset 0 0 0 1px rgba(99,70,52,0.12)",
+          }}
+        />
 
-        return (
-          <div
-            key={previewRoom.id}
-            className="absolute overflow-hidden rounded-[14px]"
-            style={{
-              left: `calc(12px + (${left} * (100% - 24px) / 100))`,
-              top: `calc(12px + (${top} * (100% - 24px) / 100))`,
-              width: `calc(${roomWidth} * (100% - 24px) / 100)`,
-              height: `calc(${roomHeight} * (100% - 24px) / 100)`,
-              background: previewRoom.color,
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
-              border: "1px solid rgba(82,57,42,0.12)",
-            }}
-          >
+        {layout.rooms.map((room) => {
+          const zone = room as {
+            id: string;
+            center: [number, number];
+            size: [number, number];
+            color: string;
+          };
+          const left = ((zone.center[0] - zone.size[0] / 2 + maxWidth / 2) / maxWidth) * 100;
+          const top = ((zone.center[1] - zone.size[1] / 2 + maxLength / 2) / maxLength) * 100;
+          const width = (zone.size[0] / maxWidth) * 100;
+          const height = (zone.size[1] / maxLength) * 100;
+
+          return (
             <div
-              className="absolute inset-0"
+              key={zone.id}
+              className="absolute"
               style={{
+                left: `calc(${inset}px + (${left} * ${innerWidth} / 100))`,
+                top: `calc(${inset}px + (${top} * ${innerHeight} / 100))`,
+                width: `calc(${width} * ${innerWidth} / 100)`,
+                height: `calc(${height} * ${innerHeight} / 100)`,
                 background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.04))",
+                  zone.id.includes("bath")
+                    ? "rgba(221,213,224,0.72)"
+                    : zone.id.includes("kitchen")
+                      ? "rgba(225,217,203,0.82)"
+                      : "rgba(236,233,228,0.72)",
               }}
             />
-          </div>
-        );
-      })}
+          );
+        })}
+
+        {layout.walls.map((wall) => {
+          const isHorizontal = wall.rotation === 0;
+          const left = isHorizontal
+            ? ((wall.position[0] - wall.length / 2 + maxWidth / 2) / maxWidth) * 100
+            : ((wall.position[0] - wall.thickness / 2 + maxWidth / 2) / maxWidth) * 100;
+          const top = isHorizontal
+            ? ((wall.position[2] - wall.thickness / 2 + maxLength / 2) / maxLength) * 100
+            : ((wall.position[2] - wall.length / 2 + maxLength / 2) / maxLength) * 100;
+          const width = (isHorizontal ? wall.length : wall.thickness) / maxWidth * 100;
+          const height = (isHorizontal ? wall.thickness : wall.length) / maxLength * 100;
+
+          return (
+            <div
+              key={wall.id}
+              className="absolute"
+              style={{
+                left: `calc(${inset}px + (${left} * ${innerWidth} / 100))`,
+                top: `calc(${inset}px + (${top} * ${innerHeight} / 100))`,
+                width: `max(${wall.kind === "exterior" ? 4 : 2}px, calc(${width} * ${innerWidth} / 100))`,
+                height: `max(${wall.kind === "exterior" ? 4 : 2}px, calc(${height} * ${innerHeight} / 100))`,
+                background: wall.kind === "exterior" ? "rgba(102,72,52,0.92)" : "rgba(160,130,109,0.88)",
+              }}
+            />
+          );
+        })}
+
+        <div
+          className="absolute rounded-[10px]"
+          style={{
+            left: inset,
+            top: inset,
+            width: innerWidth,
+            height: innerHeight,
+            boxShadow: "inset 0 0 0 1px rgba(92,63,45,0.14)",
+          }}
+        />
+      </div>
     </div>
   );
 }

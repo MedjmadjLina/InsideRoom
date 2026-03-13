@@ -18,6 +18,8 @@ export interface FurnitureItem {
   position: [number, number, number];
   /** Rotation around Y axis in degrees */
   rotation: number;
+  /** Floor level for stacked layouts such as duplexes */
+  level?: 0 | 1;
   /** Color of the furniture box */
   color: string;
   /** Optional image URL (user-uploaded texture) */

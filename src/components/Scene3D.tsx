@@ -10,6 +10,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Grid, ContactShadows } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { useEffect, useRef, useMemo } from "react";
+import { DUPLEX_LEVEL_HEIGHT } from "@/lib/apartmentLayout";
 import { useRoomStore } from "@/store/roomStore";
 import { useLightingStore, getSkyColor, getSunColor, getSceneBackground } from "@/store/lightingStore";
 import Room from "./Room";
@@ -22,6 +23,8 @@ import * as THREE from "three";
 
 /** Inner scene content (must be inside <Canvas>) */
 function SceneContent() {
+  const apartmentType = useRoomStore((s) => s.apartmentType);
+  const activeLevel = useRoomStore((s) => s.activeLevel);
   const furniture = useRoomStore((s) => s.furniture);
   const viewMode = useRoomStore((s) => s.viewMode);
   const room = useRoomStore((s) => s.room);
@@ -71,16 +74,26 @@ function SceneContent() {
     const controls = controlsRef.current;
     if (viewMode === "2d") {
       const topY = Math.max(room.width, room.length) * 1.4;
+      const targetY = apartmentType === "duplex" && activeLevel === 1 ? DUPLEX_LEVEL_HEIGHT : 0;
       controls.object.position.set(0, topY, 0.01);
-      controls.target.set(0, 0, 0);
+      controls.target.set(0, targetY, 0);
       controls.update();
     } else {
-      controls.object.position.set(
-        room.width * 0.65,
-        room.height * 1.4,
-        -room.length * 1.9
-      );
-      controls.target.set(0, room.height * 0.48, -room.length * 0.55);
+      if (apartmentType === "duplex") {
+        controls.object.position.set(
+          room.width * 0.78,
+          room.height * 0.92,
+          -room.length * 1.18,
+        );
+        controls.target.set(room.width * 0.12, room.height * 0.46, room.length * 0.02);
+      } else {
+        controls.object.position.set(
+          room.width * 0.65,
+          room.height * 1.4,
+          -room.length * 1.9
+        );
+        controls.target.set(0, room.height * 0.48, -room.length * 0.55);
+      }
       controls.update();
     }
   });
@@ -130,7 +143,7 @@ function SceneContent() {
         <group>
           <Grid
             args={[room.width, room.length]}
-            position={[0, 0.006, 0]}
+            position={[0, apartmentType === "duplex" && activeLevel === 1 ? DUPLEX_LEVEL_HEIGHT + 0.006 : 0.006, 0]}
             cellSize={0.5}
             cellColor="#cdc8c2"
             sectionSize={1}
@@ -143,7 +156,7 @@ function SceneContent() {
           />
           <Grid
             args={[room.width, room.length]}
-            position={[0, 0.004, 0]}
+            position={[0, apartmentType === "duplex" && activeLevel === 1 ? DUPLEX_LEVEL_HEIGHT + 0.004 : 0.004, 0]}
             cellSize={0.1}
             cellColor="#ddd8d3"
             sectionSize={0.5}
@@ -180,7 +193,9 @@ function SceneContent() {
 
       <Room />
 
-      {furniture.map((item) => (
+      {furniture
+        .filter((item) => viewMode !== "2d" || apartmentType !== "duplex" || (item.level ?? 0) === activeLevel || item.name.toLowerCase().includes("stair"))
+        .map((item) => (
         <Furniture key={item.id} item={item} />
       ))}
 

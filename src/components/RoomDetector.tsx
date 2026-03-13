@@ -53,16 +53,23 @@ function createLabelTexture(label: string) {
 }
 
 export default function RoomDetector() {
+  const apartmentType = useRoomStore((s) => s.apartmentType);
+  const activeLevel = useRoomStore((s) => s.activeLevel);
   const rooms = useRoomStore((s) => s.rooms);
   const viewMode = useRoomStore((s) => s.viewMode);
+  const visibleRooms = useMemo(
+    () =>
+      rooms.filter((room) => viewMode !== "2d" || apartmentType !== "duplex" || (room.level ?? 0) === activeLevel),
+    [activeLevel, apartmentType, rooms, viewMode],
+  );
 
   const roomLabels = useMemo(
     () =>
-      rooms.map((room) => ({
+      visibleRooms.map((room) => ({
         room,
         texture: createLabelTexture(room.label),
       })),
-    [rooms],
+    [visibleRooms],
   );
 
   useEffect(() => {

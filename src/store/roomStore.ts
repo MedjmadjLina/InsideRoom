@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
-import { generateApartmentLayout, normalizeWall } from "@/lib/apartmentLayout";
+import { DUPLEX_LEVEL_HEIGHT, generateApartmentLayout, normalizeWall } from "@/lib/apartmentLayout";
 import { useDoorStore } from "@/store/doorStore";
 import { useWindowStore } from "@/store/windowStore";
 import type { ApartmentType, RoomZone, WallItem } from "@/types/apartment";
@@ -86,6 +86,9 @@ interface RoomStore {
   selectedWallId: string | null;
   selectWall: (id: string | null) => void;
 
+  activeLevel: 0 | 1;
+  setActiveLevel: (level: 0 | 1) => void;
+
   // View
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
@@ -132,6 +135,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       furniture: layout.furniture,
       selectedId: null,
       selectedWallId: null,
+      activeLevel: 0 as 0 | 1,
       viewMode: "3d" as ViewMode,
     };
     persistState({
@@ -162,13 +166,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   // ---------- Walls ----------
   addWall: () => {
     set((s) => {
+      const wallHeight = s.activeLevel === 1 ? Math.max(2.2, s.room.height - DUPLEX_LEVEL_HEIGHT) : s.room.height;
       const wall = normalizeWall({
         id: uuidv4(),
         kind: "partition",
         position: [0, s.room.height / 2, 0],
+        level: s.activeLevel,
         length: 2.5,
         rotation: 0,
-        height: s.room.height,
+        height: wallHeight,
         thickness: 0.14,
         snap: 0.25,
       }, s.room);
@@ -210,9 +216,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       width: data.width / 100,
       height: data.height / 100,
       depth: data.depth / 100,
-      position: [0, (data.height / 100) / 2, 0], // placed on the floor
-      rotation: 0,
-      color: data.color,
+        position: [0, (data.height / 100) / 2 + (get().activeLevel === 1 ? DUPLEX_LEVEL_HEIGHT : 0), 0],
+        rotation: 0,
+        level: get().activeLevel,
+        color: data.color,
       imageUrl: data.imageUrl,
     };
     set((s) => {
@@ -246,6 +253,9 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   selectedWallId: null,
   selectWall: (id) => set({ selectedWallId: id, selectedId: id ? null : get().selectedId }),
 
+  activeLevel: 0,
+  setActiveLevel: (level) => set({ activeLevel: level, selectedId: null, selectedWallId: null }),
+
   // ---------- View ----------
   viewMode: "3d",
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -265,6 +275,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       furniture: layout.furniture,
       selectedId: null,
       selectedWallId: null,
+      activeLevel: 0,
       viewMode: "3d",
     });
   },
@@ -286,6 +297,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         rooms: saved.rooms ?? layout.rooms,
         walls: saved.walls?.length ? saved.walls : layout.walls,
         furniture: saved.furniture ?? [],
+        activeLevel: 0,
       });
     }
   },

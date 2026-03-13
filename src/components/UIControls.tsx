@@ -96,6 +96,7 @@ export default function UIControls() {
 
   const setAppState = useRoomStore((s) => s.setAppState);
   const apartmentType = useRoomStore((s) => s.apartmentType);
+  const activeLevel = useRoomStore((s) => s.activeLevel);
   const rooms = useRoomStore((s) => s.rooms);
   const walls = useRoomStore((s) => s.walls);
   const viewMode = useRoomStore((s) => s.viewMode);
@@ -114,6 +115,7 @@ export default function UIControls() {
   const selectWall = useRoomStore((s) => s.selectWall);
   const room = useRoomStore((s) => s.room);
   const setRoom = useRoomStore((s) => s.setRoom);
+  const setActiveLevel = useRoomStore((s) => s.setActiveLevel);
 
   // Lighting
   const sun = useLightingStore((s) => s.sun);
@@ -224,6 +226,38 @@ export default function UIControls() {
               <p className="mt-1 text-[10px] text-white/65">Generated plan with editable partitions and room labels.</p>
             </div>
 
+            {apartmentType === "duplex" && (
+              <div className="rounded-2xl border border-white/18 bg-white/10 p-3">
+                <div className="flex items-center justify-between">
+                  <p className={G.label}>Active level</p>
+                  <span className="text-[10px] text-white/62">{viewMode === "2d" ? "Editable in 2D" : "3D overview"}</span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {([
+                    [0, "Level 0"],
+                    [1, "Level 1"],
+                  ] as const).map(([level, label]) => (
+                    <button
+                      key={level}
+                      onClick={() => setActiveLevel(level)}
+                      className="rounded-2xl px-3 py-2 text-[12px] font-semibold transition-all duration-150"
+                      style={{
+                        background:
+                          activeLevel === level
+                            ? "linear-gradient(135deg,#6366f1,#3b82f6)"
+                            : "rgba(255,255,255,0.10)",
+                        color: "white",
+                        border: `1px solid ${activeLevel === level ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.18)"}`,
+                        opacity: viewMode === "2d" ? 1 : 0.86,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-white/18 bg-white/10 p-3">
                 <p className={G.label}>Rooms</p>
@@ -244,7 +278,7 @@ export default function UIControls() {
                   type="number"
                   step={0.1}
                   min={2.2}
-                  max={4.5}
+                  max={6.5}
                   value={room.height}
                   onChange={(e) => setRoom({ height: Number(e.target.value) })}
                   className={`w-full rounded-xl px-3 py-1.5 text-[12px] text-right pr-7 outline-none

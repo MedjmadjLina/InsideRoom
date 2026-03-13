@@ -42,6 +42,7 @@ function darken(hex: string, amt: number): string {
 // ── Type detection ────────────────────────────────────────────────────────────
 
 type FType = "bed" | "desk" | "sofa" | "shelf" | "chair"
+           | "stair"
            | "floor-lamp" | "bedside-lamp" | "desk-lamp" | "pendant-lamp"
            | "default";
 
@@ -58,6 +59,7 @@ function detectType(name: string): FType {
   if (n.includes("bed") || n.includes("lit"))                           return "bed";
   if (n.includes("desk") || n.includes("bureau"))                       return "desk";
   if (n.includes("sofa") || n.includes("couch") || n.includes("canap")) return "sofa";
+  if (n.includes("stair") || n.includes("escalier"))                    return "stair";
   if (n.includes("shelf") || n.includes("bookshelf") || n.includes("tag")) return "shelf";
   if (n.includes("chair") || n.includes("chaise"))                      return "chair";
   return "default";
@@ -289,6 +291,54 @@ function ChairShape({ w, h, d, color }: { w: number; h: number; d: number; color
         <boxGeometry args={[w - 0.04, backH, 0.06]} />
         <meshStandardMaterial {...fabricProps(darken(seatColor, 0.04))} />
       </mesh>
+    </group>
+  );
+}
+
+function StairShape({ w, h, d, color }: { w: number; h: number; d: number; color: string }) {
+  const steps = 6;
+  const stepH = h / steps;
+  const stepD = d / steps;
+  const treadColor = lighten(color, 0.12);
+  const sideColor = darken(color, 0.04);
+  const railColor = "#2c231b";
+
+  return (
+    <group>
+      {Array.from({ length: steps }).map((_, index) => {
+        const currentHeight = stepH * (index + 1);
+        const treadY = -h / 2 + currentHeight - stepH / 2;
+        const treadZ = d / 2 - stepD * (index + 0.5);
+        return (
+          <group key={index}>
+            <mesh position={[0, treadY, treadZ]} castShadow receiveShadow>
+              <boxGeometry args={[w, stepH * 0.36, stepD * 0.94]} />
+              <meshStandardMaterial {...woodProps(index % 2 === 0 ? treadColor : color)} />
+            </mesh>
+            <mesh position={[-w / 2 + 0.06, -h / 2 + currentHeight / 2, treadZ]} castShadow receiveShadow>
+              <boxGeometry args={[0.08, currentHeight, stepD * 0.94]} />
+              <meshStandardMaterial {...woodProps(sideColor)} />
+            </mesh>
+            <mesh position={[w / 2 - 0.06, -h / 2 + currentHeight / 2, treadZ]} castShadow receiveShadow>
+              <boxGeometry args={[0.08, currentHeight, stepD * 0.94]} />
+              <meshStandardMaterial {...woodProps(sideColor)} />
+            </mesh>
+          </group>
+        );
+      })}
+
+      {([-1, 1] as const).map((side) => (
+        <group key={side} position={[side * (w / 2 - 0.03), 0, -d * 0.05]}>
+          <mesh position={[0, 0, 0]} castShadow>
+            <boxGeometry args={[0.03, h, 0.03]} />
+            <meshStandardMaterial {...metalProps(railColor)} />
+          </mesh>
+          <mesh position={[0, h / 2 - 0.08, -d * 0.26]} rotation={[0.12, 0, 0]} castShadow>
+            <boxGeometry args={[0.03, 0.03, d * 0.8]} />
+            <meshStandardMaterial {...metalProps(railColor)} />
+          </mesh>
+        </group>
+      ))}
     </group>
   );
 }
@@ -579,6 +629,7 @@ export default function FurnitureShape({ item }: FurnitureShapeProps) {
     case "bed":           return <BedShape          w={w} h={h} d={d} color={color} />;
     case "desk":          return <DeskShape         w={w} h={h} d={d} color={color} />;
     case "sofa":          return <SofaShape         w={w} h={h} d={d} color={color} />;
+    case "stair":         return <StairShape        w={w} h={h} d={d} color={color} />;
     case "shelf":         return <ShelfShape        w={w} h={h} d={d} color={color} />;
     case "chair":         return <ChairShape        w={w} h={h} d={d} color={color} />;
     case "floor-lamp":    return <FloorLampShape    w={w} h={h} d={d} color={color} />;
