@@ -8,6 +8,8 @@
 import { create } from "zustand";
 import { v4 as uuidv4 } from "uuid";
 import { generateApartmentLayout, normalizeWall } from "@/lib/apartmentLayout";
+import { useDoorStore } from "@/store/doorStore";
+import { useWindowStore } from "@/store/windowStore";
 import type { ApartmentType, RoomZone, WallItem } from "@/types/apartment";
 import type {
   FurnitureItem,
@@ -86,6 +88,7 @@ interface RoomStore {
 
   // View
   viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   toggleViewMode: () => void;
 
   // Persistence
@@ -119,14 +122,17 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   generateApartment: (type) => {
     const layout = generateApartmentLayout(type);
+    useDoorStore.getState().clearPlacedDoors();
+    useWindowStore.getState().clearPlacedWindows();
     const next = {
       apartmentType: layout.type,
       room: layout.room,
       rooms: layout.rooms,
       walls: layout.walls,
-      furniture: [] as FurnitureItem[],
+      furniture: layout.furniture,
       selectedId: null,
       selectedWallId: null,
+      viewMode: "3d" as ViewMode,
     };
     persistState({
       apartmentType: next.apartmentType,
@@ -186,6 +192,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   removeWall: (id) => {
     set((s) => {
       const walls = s.walls.filter((wall) => wall.id !== id);
+      useDoorStore.getState().prunePlacedDoors(walls.map((wall) => wall.id));
+      useWindowStore.getState().prunePlacedWindows(walls.map((wall) => wall.id));
       persistState({ apartmentType: s.apartmentType, room: s.room, rooms: s.rooms, walls, furniture: s.furniture });
       return { walls, selectedWallId: s.selectedWallId === id ? null : s.selectedWallId };
     });
@@ -240,18 +248,21 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   // ---------- View ----------
   viewMode: "3d",
+  setViewMode: (mode) => set({ viewMode: mode }),
   toggleViewMode: () =>
     set((s) => ({ viewMode: s.viewMode === "3d" ? "2d" : "3d" })),
 
   // ---------- Persistence ----------
   resetRoom: () => {
     if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
+    useDoorStore.getState().clearPlacedDoors();
+    useWindowStore.getState().clearPlacedWindows();
     const layout = generateApartmentLayout(get().apartmentType);
     set({
       room: { ...layout.room },
       rooms: layout.rooms,
       walls: layout.walls,
-      furniture: [],
+      furniture: layout.furniture,
       selectedId: null,
       selectedWallId: null,
       viewMode: "3d",
@@ -265,6 +276,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       localStorage.removeItem("insideroom-layout");
     }
     const saved = loadFromStorage();
+    useDoorStore.getState().clearPlacedDoors();
+    useWindowStore.getState().clearPlacedWindows();
     if (saved) {
       const layout = generateApartmentLayout(saved.apartmentType ?? DEFAULT_LAYOUT.type);
       set({

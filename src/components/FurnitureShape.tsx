@@ -515,17 +515,16 @@ function DeskLampShape({ h, color }: { w: number; h: number; d: number; color: s
 // ─────────────────────────────────────────────────────────────────────────────
 function PendantLampShape({ h, color }: { w: number; h: number; d: number; color: string }) {
   const intensity  = useLampIntensity(28);
-  const shadeColor = darken(color, 0.04);
   const ceilTop    = h / 2;          // top of bounding box = near ceiling
-  const cordLen    = h * 0.38;       // shorter cord → fixture hangs at ~eye level
-  const fixtureY   = ceilTop - cordLen;
+  const cordLen    = h * 0.42;
+  const bulbY      = ceilTop - cordLen;
 
   return (
     <group>
       {/* Ceiling canopy disc */}
       <mesh position={[0, ceilTop - 0.022, 0]}>
-        <cylinderGeometry args={[0.055, 0.055, 0.044, 16]} />
-        <meshStandardMaterial color="#e0ddd8" roughness={0.58} metalness={0.12} />
+        <cylinderGeometry args={[0.048, 0.048, 0.036, 16]} />
+        <meshStandardMaterial color="#e7dfd4" roughness={0.62} metalness={0.08} />
       </mesh>
 
       {/* Cord */}
@@ -534,37 +533,27 @@ function PendantLampShape({ h, color }: { w: number; h: number; d: number; color
         <meshStandardMaterial color={CORD} roughness={0.88} metalness={0} />
       </mesh>
 
-      {/* Fixture body — tapered pendant */}
-      <mesh position={[0, fixtureY - 0.08, 0]} castShadow>
-        <cylinderGeometry args={[0.12, 0.06, 0.18, 20, 1, true]} />
-        <meshStandardMaterial
-          color={shadeColor} roughness={0.75} metalness={0.08}
-          side={THREE.DoubleSide}
-          emissive={new THREE.Color(lighten(shadeColor, 0.12))} emissiveIntensity={0.28}
-        />
-      </mesh>
-
-      {/* Metal socket ring */}
-      <mesh position={[0, fixtureY + 0.008, 0]}>
-        <cylinderGeometry args={[0.032, 0.032, 0.022, 14]} />
+      {/* Small socket */}
+      <mesh position={[0, bulbY + 0.04, 0]}>
+        <cylinderGeometry args={[0.022, 0.024, 0.05, 14]} />
         <meshStandardMaterial color={BRASS} roughness={0.28} metalness={0.88} />
       </mesh>
 
-      {/* Interior bulb glow */}
-      <mesh position={[0, fixtureY - 0.038, 0]}>
-        <sphereGeometry args={[0.022, 10, 8]} />
+      {/* Bare bulb */}
+      <mesh position={[0, bulbY, 0]}>
+        <sphereGeometry args={[0.075, 18, 18]} />
         <meshStandardMaterial
-          color="#fffde8"
-          emissive={new THREE.Color("#fffde8")}
-          emissiveIntensity={intensity > 8 ? 3.5 : 1.2}
-          roughness={0}
+          color="#fff4cf"
+          emissive={new THREE.Color("#fff1c2")}
+          emissiveIntensity={intensity > 8 ? 4.2 : 1.8}
+          roughness={0.08}
           metalness={0}
         />
       </mesh>
 
-      {/* Warm downward light */}
+      {/* Warm light */}
       <pointLight
-        position={[0, fixtureY - 0.14, 0]}
+        position={[0, bulbY - 0.02, 0]}
         color="#ffd06a"
         intensity={intensity}
         distance={8}

@@ -23,3 +23,19 @@ export interface WindowConfig {
   /** Frame color (hex) */
   frameColor: string;
 }
+
+export interface PlacedWindow {
+  id: string;
+  wallId: string;
+  type: WindowType;
+  /** Absolute width in meters for non-facade walls */
+  width: number;
+  /** Opening height in meters */
+  height: number;
+  /** Height of the sill from the floor in meters */
+  sillHeight: number;
+  /** Horizontal offset along the wall from its center */
+  offset: number;
+  /** Frame color (hex) */
+  frameColor: string;
+}

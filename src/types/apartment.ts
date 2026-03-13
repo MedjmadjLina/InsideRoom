@@ -1,4 +1,4 @@
-import type { RoomDimensions } from "@/types/furniture";
+import type { FurnitureItem, RoomDimensions } from "@/types/furniture";
 
 export type ApartmentType =
   | "empty-space"
@@ -45,4 +45,5 @@ export interface ApartmentLayout {
   room: RoomDimensions;
   rooms: RoomZone[];
   walls: WallItem[];
+  furniture: FurnitureItem[];
 }

@@ -3,49 +3,24 @@
 import { DoubleSide } from "three";
 import { useMemo } from "react";
 import { useRoomStore } from "@/store/roomStore";
-import { useWindowStore } from "@/store/windowStore";
 import Wall from "./Wall";
 import RoomDetector from "./RoomDetector";
-
-function WindowRibbon() {
-  const room = useRoomStore((s) => s.room);
-  const config = useWindowStore((s) => s.config);
-
-  const width = useMemo(() => Math.max(1.1, room.width * config.widthFraction * 0.55), [config.widthFraction, room.width]);
-  const centerY = config.sillHeight + config.height / 2;
-  const wallZ = -room.length / 2 + 0.015;
-
-  return (
-    <group position={[0, centerY, wallZ]}>
-      <mesh>
-        <boxGeometry args={[width + 0.18, config.height + 0.18, 0.06]} />
-        <meshStandardMaterial color="#d8d0c4" roughness={0.74} metalness={0.04} />
-      </mesh>
-      <mesh position={[0, 0, 0.012]}>
-        <boxGeometry args={[width, config.height, 0.02]} />
-        <meshStandardMaterial
-          color="#bfd5e4"
-          roughness={0.05}
-          metalness={0.04}
-          transparent
-          opacity={0.48}
-        />
-      </mesh>
-      <mesh position={[0, 0, 0.03]}>
-        <boxGeometry args={[0.03, config.height, 0.05]} />
-        <meshStandardMaterial color={config.frameColor} roughness={0.42} metalness={0.14} />
-      </mesh>
-      <mesh position={[0, 0, 0.03]}>
-        <boxGeometry args={[width + 0.06, 0.03, 0.05]} />
-        <meshStandardMaterial color={config.frameColor} roughness={0.42} metalness={0.14} />
-      </mesh>
-    </group>
-  );
-}
+import WindowWall from "./WindowWall";
 
 export default function PartitionSystem() {
   const room = useRoomStore((s) => s.room);
   const walls = useRoomStore((s) => s.walls);
+  const visibleWalls = useMemo(
+    () =>
+      walls.filter((wall) => {
+        const isFrontExterior =
+          wall.kind === "exterior" &&
+          wall.rotation === 0 &&
+          Math.abs(wall.position[2] - (-room.length / 2 + wall.thickness / 2)) < 0.02;
+        return !isFrontExterior;
+      }),
+    [room.length, walls],
+  );
 
   return (
     <group>
@@ -72,9 +47,9 @@ export default function PartitionSystem() {
       </mesh>
 
       <RoomDetector />
-      <WindowRibbon />
+      <WindowWall width={room.width} height={room.height} wallT={0.22} posZ={-room.length / 2 + 0.11} />
 
-      {walls.map((wall) => (
+      {visibleWalls.map((wall) => (
         <Wall key={wall.id} wall={wall} />
       ))}
     </group>

@@ -7,9 +7,11 @@
 
 import { useState, useMemo } from "react";
 import { GRID_SIZE, getApartmentTypeLabel } from "@/lib/apartmentLayout";
+import { useDoorStore } from "@/store/doorStore";
 import { useRoomStore } from "@/store/roomStore";
 import { useLightingStore, getSunColor } from "@/store/lightingStore";
 import { useWindowStore } from "@/store/windowStore";
+import type { DoorType } from "@/types/door";
 import type { WindowType } from "@/types/window";
 import FurnitureForm from "./FurnitureForm";
 
@@ -60,6 +62,35 @@ const IconHome = () => (
   </svg>
 );
 
+const WINDOW_TYPE_OPTIONS: [WindowType, string, string][] = [
+  ["simple", "▭", "Simple"],
+  ["bay", "⬡", "Bay"],
+  ["double-vertical", "▮▮", "Double"],
+  ["arched", "⌒", "Arched"],
+  ["loft", "⊞", "Loft"],
+];
+
+const FRAME_COLOR_OPTIONS: [string, string][] = [
+  ["#e8e2d8", "Blanc"],
+  ["#c8b89a", "Bois"],
+  ["#1c1c1e", "Acier"],
+  ["#5a4a3a", "Wenge"],
+  ["#b5c4c8", "Alu"],
+];
+
+const DOOR_TYPE_OPTIONS: [DoorType, string, string][] = [
+  ["swing", "▯", "Swing"],
+  ["double", "▯▯", "Double"],
+  ["arched", "⌒", "Arched"],
+];
+
+const DOOR_COLOR_OPTIONS: [string, string][] = [
+  ["#7a5a43", "Walnut"],
+  ["#9a7657", "Oak"],
+  ["#ece5db", "Paint"],
+  ["#2f2a27", "Dark"],
+];
+
 export default function UIControls() {
   const [showForm, setShowForm] = useState(false);
 
@@ -100,15 +131,49 @@ export default function UIControls() {
 
   const selected = furniture.find((f) => f.id === selectedId) ?? null;
   const selectedWall = walls.find((wall) => wall.id === selectedWallId) ?? null;
+  const isExteriorWall = selectedWall?.kind === "exterior";
+  const isFrontFacadeWall = selectedWall
+    ? selectedWall.kind === "exterior" &&
+      selectedWall.rotation === 0 &&
+      Math.abs(selectedWall.position[2] - (-room.length / 2 + selectedWall.thickness / 2)) < 0.02
+    : false;
   const layoutLabel = useMemo(() => getApartmentTypeLabel(apartmentType), [apartmentType]);
 
   // Windows
-  const winConfig        = useWindowStore((s) => s.config);
-  const setWinType       = useWindowStore((s) => s.setType);
-  const setWinWidth      = useWindowStore((s) => s.setWidthFraction);
-  const setWinHeight     = useWindowStore((s) => s.setHeight);
-  const setWinSill       = useWindowStore((s) => s.setSillHeight);
+  const winConfig = useWindowStore((s) => s.config);
+  const placedWindows = useWindowStore((s) => s.placedWindows);
+  const selectedPlacedWindowId = useWindowStore((s) => s.selectedPlacedWindowId);
+  const setWinType = useWindowStore((s) => s.setType);
+  const setWinWidth = useWindowStore((s) => s.setWidthFraction);
+  const setWinHeight = useWindowStore((s) => s.setHeight);
+  const setWinSill = useWindowStore((s) => s.setSillHeight);
   const setWinFrameColor = useWindowStore((s) => s.setFrameColor);
+  const addPlacedWindow = useWindowStore((s) => s.addPlacedWindow);
+  const updatePlacedWindow = useWindowStore((s) => s.updatePlacedWindow);
+  const removePlacedWindow = useWindowStore((s) => s.removePlacedWindow);
+  const selectPlacedWindow = useWindowStore((s) => s.selectPlacedWindow);
+  const selectedWallWindows = selectedWall
+    ? placedWindows.filter((window) => window.wallId === selectedWall.id)
+    : [];
+  const selectedPlacedWindow =
+    selectedWallWindows.find((window) => window.id === selectedPlacedWindowId) ??
+    selectedWallWindows[0] ??
+    null;
+
+  // Doors
+  const placedDoors = useDoorStore((s) => s.placedDoors);
+  const selectedPlacedDoorId = useDoorStore((s) => s.selectedPlacedDoorId);
+  const addPlacedDoor = useDoorStore((s) => s.addPlacedDoor);
+  const updatePlacedDoor = useDoorStore((s) => s.updatePlacedDoor);
+  const removePlacedDoor = useDoorStore((s) => s.removePlacedDoor);
+  const selectPlacedDoor = useDoorStore((s) => s.selectPlacedDoor);
+  const selectedWallDoors = selectedWall
+    ? placedDoors.filter((door) => door.wallId === selectedWall.id)
+    : [];
+  const selectedPlacedDoor =
+    selectedWallDoors.find((door) => door.id === selectedPlacedDoorId) ??
+    selectedWallDoors[0] ??
+    null;
 
   /** Friendly time label from 0–24 float */
   const timeLabel = (t: number) => {
@@ -321,21 +386,18 @@ export default function UIControls() {
         {/* ── Windows ── */}
         <div className={`rounded-3xl overflow-hidden flex-shrink-0 ${G.panel}`}>
           <div className={G.sectionHeader}>
-            <span className={G.heading}>Windows</span>
+            <span className={G.heading}>Facade window</span>
           </div>
           <div className="p-3.5 space-y-3">
+            <p className="text-[10px] leading-4 text-white/68">
+              Main front opening. Use the wall inspector to place windows on the other walls.
+            </p>
 
             {/* Type picker */}
             <div>
               <p className={`${G.label} mb-1.5`}>Type</p>
               <div className="grid grid-cols-5 gap-1">
-                {([
-                  ["simple",          "▭",  "Simple"],
-                  ["bay",             "⬡",  "Bay"],
-                  ["double-vertical", "⬛⬛", "Double"],
-                  ["arched",          "⌒",  "Arched"],
-                  ["loft",            "⊞",  "Loft"],
-                ] as [WindowType, string, string][]).map(([type, icon, label]) => (
+                {WINDOW_TYPE_OPTIONS.map(([type, icon, label]) => (
                   <button
                     key={type}
                     onClick={() => setWinType(type)}
@@ -403,13 +465,7 @@ export default function UIControls() {
             <div>
               <p className={`${G.label} mb-1.5`}>Frame</p>
               <div className="flex gap-1.5 flex-wrap">
-                {([
-                  ["#e8e2d8", "Blanc"],
-                  ["#c8b89a", "Bois"],
-                  ["#1c1c1e", "Acier"],
-                  ["#5a4a3a", "Wengé"],
-                  ["#b5c4c8", "Alu"],
-                ] as [string, string][]).map(([col, name]) => (
+                {FRAME_COLOR_OPTIONS.map(([col, name]) => (
                   <button
                     key={col}
                     title={name}
@@ -524,6 +580,7 @@ export default function UIControls() {
                       min={step}
                       max={max}
                       value={Number(val.toFixed(2))}
+                      disabled={isExteriorWall}
                       onChange={(e) => updateWall(selectedWall.id, { [key]: Number(e.target.value) })}
                       className={`w-full rounded-xl pl-7 pr-1.5 py-[7px] text-[12px] text-right outline-none
                                   focus:ring-2 focus:ring-white/60 tabular-nums ${G.input}`}
@@ -551,6 +608,7 @@ export default function UIControls() {
                       type="number"
                       step={GRID_SIZE}
                       value={Number(selectedWall.position[index].toFixed(2))}
+                      disabled={isExteriorWall}
                       onChange={(e) => {
                         const position: [number, number, number] = [...selectedWall.position];
                         position[index] = Number(e.target.value);
@@ -573,7 +631,9 @@ export default function UIControls() {
                 {[0, 45, 90, 135, 180].map((deg) => (
                   <button
                     key={deg}
-                    onClick={() => updateWall(selectedWall.id, { rotation: deg })}
+                    onClick={() => {
+                      if (!isExteriorWall) updateWall(selectedWall.id, { rotation: deg });
+                    }}
                     className="flex-1 py-1 rounded-xl text-[10px] font-semibold transition-all duration-150"
                     style={{
                       background: selectedWall.rotation === deg
@@ -593,12 +653,346 @@ export default function UIControls() {
                 max={180}
                 step={5}
                 value={selectedWall.rotation}
+                disabled={isExteriorWall}
                 onChange={(e) => updateWall(selectedWall.id, { rotation: Number(e.target.value) })}
                 className="glass-range w-full"
               />
             </div>
 
             <div className={`h-px ${G.divider}`} />
+
+            {isFrontFacadeWall ? (
+              <p className="text-[10px] leading-4 text-white/68">
+                This is the main facade wall. Edit its opening from the Facade window panel on the left.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className={G.label}>Wall windows</p>
+                    <p className="text-[10px] text-white/62 leading-4">
+                      Add one or more openings on this wall and tune their shape.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => addPlacedWindow(selectedWall.id, selectedWall.length, selectedWall.height)}
+                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-white/20 border border-white/30 text-white/90 hover:bg-white/35 transition-all duration-150"
+                  >
+                    + Add window
+                  </button>
+                </div>
+
+                {selectedWallWindows.length > 0 ? (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedWallWindows.map((window, index) => (
+                        <button
+                          key={window.id}
+                          onClick={() => selectPlacedWindow(window.id)}
+                          className="px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all duration-150"
+                          style={{
+                            background:
+                              selectedPlacedWindow?.id === window.id
+                                ? "linear-gradient(135deg,#6366f1,#3b82f6)"
+                                : "rgba(255,255,255,0.15)",
+                            borderColor:
+                              selectedPlacedWindow?.id === window.id
+                                ? "rgba(99,102,241,0.55)"
+                                : "rgba(255,255,255,0.22)",
+                            color: "white",
+                          }}
+                        >
+                          Window {index + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedPlacedWindow && (
+                      <div className="space-y-3 rounded-2xl border border-white/16 bg-black/10 p-3">
+                        <div>
+                          <p className={`${G.label} mb-1.5`}>Shape</p>
+                          <div className="grid grid-cols-5 gap-1">
+                            {WINDOW_TYPE_OPTIONS.map(([type, icon, label]) => (
+                              <button
+                                key={type}
+                                onClick={() => updatePlacedWindow(selectedPlacedWindow.id, { type })}
+                                title={label}
+                                className="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 border"
+                                style={{
+                                  background:
+                                    selectedPlacedWindow.type === type
+                                      ? "linear-gradient(135deg,#6366f1,#3b82f6)"
+                                      : "rgba(255,255,255,0.12)",
+                                  borderColor:
+                                    selectedPlacedWindow.type === type
+                                      ? "rgba(99,102,241,0.6)"
+                                      : "rgba(255,255,255,0.2)",
+                                  color: "white",
+                                }}
+                              >
+                                <span className="text-[13px] leading-none">{icon}</span>
+                                <span className="text-[8px] leading-none opacity-80">{label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className={G.label} style={{ minWidth: 40 }}>Width</label>
+                          <input
+                            type="range"
+                            min={0.7}
+                            max={Math.max(0.8, selectedWall.length - 0.22)}
+                            step={0.05}
+                            value={selectedPlacedWindow.width}
+                            onChange={(e) => updatePlacedWindow(selectedPlacedWindow.id, { width: Number(e.target.value) })}
+                            className="glass-range flex-1"
+                          />
+                          <span className={G.value}>{selectedPlacedWindow.width.toFixed(2)}m</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className={G.label} style={{ minWidth: 40 }}>Height</label>
+                          <input
+                            type="range"
+                            min={0.7}
+                            max={Math.max(0.8, selectedWall.height - selectedPlacedWindow.sillHeight - 0.12)}
+                            step={0.05}
+                            value={selectedPlacedWindow.height}
+                            onChange={(e) => updatePlacedWindow(selectedPlacedWindow.id, { height: Number(e.target.value) })}
+                            className="glass-range flex-1"
+                          />
+                          <span className={G.value}>{selectedPlacedWindow.height.toFixed(2)}m</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className={G.label} style={{ minWidth: 40 }}>Sill</label>
+                          <input
+                            type="range"
+                            min={0.2}
+                            max={Math.max(0.25, selectedWall.height - selectedPlacedWindow.height - 0.08)}
+                            step={0.05}
+                            value={selectedPlacedWindow.sillHeight}
+                            onChange={(e) => updatePlacedWindow(selectedPlacedWindow.id, { sillHeight: Number(e.target.value) })}
+                            className="glass-range flex-1"
+                          />
+                          <span className={G.value}>{selectedPlacedWindow.sillHeight.toFixed(2)}m</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <label className={G.label} style={{ minWidth: 40 }}>Offset</label>
+                          <input
+                            type="range"
+                            min={-(selectedWall.length / 2 - selectedPlacedWindow.width / 2 - 0.08)}
+                            max={selectedWall.length / 2 - selectedPlacedWindow.width / 2 - 0.08}
+                            step={0.05}
+                            value={selectedPlacedWindow.offset}
+                            onChange={(e) => updatePlacedWindow(selectedPlacedWindow.id, { offset: Number(e.target.value) })}
+                            className="glass-range flex-1"
+                          />
+                          <span className={G.value}>{selectedPlacedWindow.offset.toFixed(2)}m</span>
+                        </div>
+
+                        <div>
+                          <p className={`${G.label} mb-1.5`}>Frame</p>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {FRAME_COLOR_OPTIONS.map(([col, name]) => (
+                              <button
+                                key={col}
+                                title={name}
+                                onClick={() => updatePlacedWindow(selectedPlacedWindow.id, { frameColor: col })}
+                                className="w-7 h-7 rounded-lg border-2 transition-all duration-150 hover:scale-110 active:scale-95"
+                                style={{
+                                  background: col,
+                                  borderColor:
+                                    selectedPlacedWindow.frameColor === col
+                                      ? "rgba(99,102,241,0.85)"
+                                      : "rgba(255,255,255,0.30)",
+                                  boxShadow:
+                                    selectedPlacedWindow.frameColor === col
+                                      ? "0 0 0 1px rgba(99,102,241,0.5)"
+                                      : "none",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => removePlacedWindow(selectedPlacedWindow.id)}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-2xl text-[11px] font-bold bg-rose-500/15 border border-rose-400/25 text-rose-300 hover:bg-rose-500/25 active:scale-[0.96] transition-all duration-150"
+                        >
+                          <IconTrash /> Remove window
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[10px] italic text-white/55">
+                    No added windows on this wall yet.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!isFrontFacadeWall && (
+              <>
+                <div className={`h-px ${G.divider}`} />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className={G.label}>Doors</p>
+                      <p className="text-[10px] text-white/62 leading-4">
+                        Add interior or service doors on this wall.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => addPlacedDoor(selectedWall.id, selectedWall.length, selectedWall.height)}
+                      className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-white/20 border border-white/30 text-white/90 hover:bg-white/35 transition-all duration-150"
+                    >
+                      + Add door
+                    </button>
+                  </div>
+
+                  {selectedWallDoors.length > 0 ? (
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedWallDoors.map((door, index) => (
+                          <button
+                            key={door.id}
+                            onClick={() => selectPlacedDoor(door.id)}
+                            className="px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all duration-150"
+                            style={{
+                              background:
+                                selectedPlacedDoor?.id === door.id
+                                  ? "linear-gradient(135deg,#8b5cf6,#6366f1)"
+                                  : "rgba(255,255,255,0.15)",
+                              borderColor:
+                                selectedPlacedDoor?.id === door.id
+                                  ? "rgba(139,92,246,0.55)"
+                                  : "rgba(255,255,255,0.22)",
+                              color: "white",
+                            }}
+                          >
+                            Door {index + 1}
+                          </button>
+                        ))}
+                      </div>
+
+                      {selectedPlacedDoor && (
+                        <div className="space-y-3 rounded-2xl border border-white/16 bg-black/10 p-3">
+                          <div>
+                            <p className={`${G.label} mb-1.5`}>Type</p>
+                            <div className="grid grid-cols-3 gap-1">
+                              {DOOR_TYPE_OPTIONS.map(([type, icon, label]) => (
+                                <button
+                                  key={type}
+                                  onClick={() => updatePlacedDoor(selectedPlacedDoor.id, { type })}
+                                  className="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl text-[11px] font-bold transition-all duration-150 border"
+                                  style={{
+                                    background:
+                                      selectedPlacedDoor.type === type
+                                        ? "linear-gradient(135deg,#8b5cf6,#6366f1)"
+                                        : "rgba(255,255,255,0.12)",
+                                    borderColor:
+                                      selectedPlacedDoor.type === type
+                                        ? "rgba(139,92,246,0.6)"
+                                        : "rgba(255,255,255,0.2)",
+                                    color: "white",
+                                  }}
+                                >
+                                  <span className="text-[13px] leading-none">{icon}</span>
+                                  <span className="text-[8px] leading-none opacity-80">{label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <label className={G.label} style={{ minWidth: 40 }}>Width</label>
+                            <input
+                              type="range"
+                              min={0.8}
+                              max={Math.max(0.9, selectedWall.length - 0.16)}
+                              step={0.05}
+                              value={selectedPlacedDoor.width}
+                              onChange={(e) => updatePlacedDoor(selectedPlacedDoor.id, { width: Number(e.target.value) })}
+                              className="glass-range flex-1"
+                            />
+                            <span className={G.value}>{selectedPlacedDoor.width.toFixed(2)}m</span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <label className={G.label} style={{ minWidth: 40 }}>Height</label>
+                            <input
+                              type="range"
+                              min={1.95}
+                              max={Math.max(2.0, selectedWall.height - 0.05)}
+                              step={0.05}
+                              value={selectedPlacedDoor.height}
+                              onChange={(e) => updatePlacedDoor(selectedPlacedDoor.id, { height: Number(e.target.value) })}
+                              className="glass-range flex-1"
+                            />
+                            <span className={G.value}>{selectedPlacedDoor.height.toFixed(2)}m</span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <label className={G.label} style={{ minWidth: 40 }}>Offset</label>
+                            <input
+                              type="range"
+                              min={-(selectedWall.length / 2 - selectedPlacedDoor.width / 2 - 0.08)}
+                              max={selectedWall.length / 2 - selectedPlacedDoor.width / 2 - 0.08}
+                              step={0.05}
+                              value={selectedPlacedDoor.offset}
+                              onChange={(e) => updatePlacedDoor(selectedPlacedDoor.id, { offset: Number(e.target.value) })}
+                              className="glass-range flex-1"
+                            />
+                            <span className={G.value}>{selectedPlacedDoor.offset.toFixed(2)}m</span>
+                          </div>
+
+                          <div>
+                            <p className={`${G.label} mb-1.5`}>Finish</p>
+                            <div className="flex gap-1.5 flex-wrap">
+                              {DOOR_COLOR_OPTIONS.map(([col, name]) => (
+                                <button
+                                  key={col}
+                                  title={name}
+                                  onClick={() => updatePlacedDoor(selectedPlacedDoor.id, { color: col })}
+                                  className="w-7 h-7 rounded-lg border-2 transition-all duration-150 hover:scale-110 active:scale-95"
+                                  style={{
+                                    background: col,
+                                    borderColor:
+                                      selectedPlacedDoor.color === col
+                                        ? "rgba(139,92,246,0.85)"
+                                        : "rgba(255,255,255,0.30)",
+                                    boxShadow:
+                                      selectedPlacedDoor.color === col
+                                        ? "0 0 0 1px rgba(139,92,246,0.5)"
+                                        : "none",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => removePlacedDoor(selectedPlacedDoor.id)}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-2xl text-[11px] font-bold bg-rose-500/15 border border-rose-400/25 text-rose-300 hover:bg-rose-500/25 active:scale-[0.96] transition-all duration-150"
+                          >
+                            <IconTrash /> Remove door
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-[10px] italic text-white/55">
+                      No doors on this wall yet.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="flex gap-2">
               <button
@@ -610,12 +1004,16 @@ export default function UIControls() {
                 <IconPlus /> Add wall
               </button>
               <button
-                onClick={() => removeWall(selectedWall.id)}
+                onClick={() => {
+                  if (!isExteriorWall) removeWall(selectedWall.id);
+                }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-2xl text-[11px] font-bold
                            bg-rose-500/15 border border-rose-400/25 text-rose-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]
                            hover:bg-rose-500/25 active:scale-[0.96] transition-all duration-150"
+                disabled={isExteriorWall}
+                style={{ opacity: isExteriorWall ? 0.45 : 1, cursor: isExteriorWall ? "not-allowed" : "pointer" }}
               >
-                <IconTrash /> Delete
+                <IconTrash /> {isExteriorWall ? "Locked" : "Delete"}
               </button>
             </div>
           </div>

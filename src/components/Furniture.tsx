@@ -20,11 +20,13 @@ interface FurnitureProps {
 export default function Furniture({ item }: FurnitureProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const selectedId = useRoomStore((s) => s.selectedId);
+  const viewMode = useRoomStore((s) => s.viewMode);
   const selectFurniture = useRoomStore((s) => s.selectFurniture);
   const updateFurniture = useRoomStore((s) => s.updateFurniture);
   const room = useRoomStore((s) => s.room);
 
   const isSelected = selectedId === item.id;
+  const isEditable = viewMode === "2d";
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const { camera, raycaster, gl } = useThree();
@@ -43,6 +45,7 @@ export default function Furniture({ item }: FurnitureProps) {
   /** On pointer down: start drag */
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
+      if (!isEditable) return;
       e.stopPropagation();
       selectFurniture(item.id);
 
@@ -59,13 +62,13 @@ export default function Furniture({ item }: FurnitureProps) {
       setIsDragging(true);
       (e.target as HTMLElement).setPointerCapture?.(e.nativeEvent.pointerId);
     },
-    [item, camera, raycaster, gl, selectFurniture]
+    [item, camera, raycaster, gl, isEditable, selectFurniture]
   );
 
   /** On pointer move: update position */
   const handlePointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      if (!isDragging) return;
+      if (!isEditable || !isDragging) return;
       e.stopPropagation();
 
       const mouse = new THREE.Vector2(
@@ -87,16 +90,17 @@ export default function Furniture({ item }: FurnitureProps) {
         position: [newPos.x, newPos.y, newPos.z],
       });
     },
-    [isDragging, item, camera, raycaster, gl, room, updateFurniture]
+    [isDragging, isEditable, item, camera, raycaster, gl, room, updateFurniture]
   );
 
   /** On pointer up: stop drag */
   const handlePointerUp = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
+      if (!isEditable) return;
       e.stopPropagation();
       setIsDragging(false);
     },
-    []
+    [isEditable]
   );
 
   const rotationRad = (item.rotation * Math.PI) / 180;
@@ -112,8 +116,16 @@ export default function Furniture({ item }: FurnitureProps) {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerOver={() => { setIsHovered(true);  document.body.style.cursor = "grab"; }}
-        onPointerOut={() =>  { setIsHovered(false); document.body.style.cursor = "default"; }}
+        onPointerOver={() => {
+          if (!isEditable) return;
+          setIsHovered(true);
+          document.body.style.cursor = "grab";
+        }}
+        onPointerOut={() =>  {
+          if (!isEditable) return;
+          setIsHovered(false);
+          document.body.style.cursor = "default";
+        }}
       >
         <boxGeometry args={[item.width, item.height, item.depth]} />
         <meshStandardMaterial transparent opacity={0} depthWrite={false} />

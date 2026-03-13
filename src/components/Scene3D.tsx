@@ -28,7 +28,6 @@ function SceneContent() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const cameraReady = useRef(false);
 
-  // Lighting state
   const sun = useLightingStore((s) => s.sun);
   const ambient = useLightingStore((s) => s.ambient);
   const skyColor = useMemo(() => getSkyColor(sun.timeOfDay), [sun.timeOfDay]);
@@ -53,7 +52,6 @@ function SceneContent() {
     return "#d2bda4";
   }, [sun.timeOfDay]);
 
-  // Atmospheric fog: tighter in 3D so the exterior reads with more depth haze.
   const fogNear = useMemo(() => {
     const t = sun.timeOfDay;
     return (t >= 7 && t < 18) ? 10 : 7;
@@ -63,12 +61,10 @@ function SceneContent() {
     return (t >= 7 && t < 18) ? 72 : 46;
   }, [sun.timeOfDay]);
 
-  // Mark camera as needing re-init whenever room or viewMode changes
   useEffect(() => {
     cameraReady.current = false;
   }, [viewMode, room]);
 
-  // Position camera on the first R3F frame after a change, ensuring OrbitControls is ready
   useFrame(() => {
     if (cameraReady.current || !controlsRef.current) return;
     cameraReady.current = true;
@@ -91,23 +87,12 @@ function SceneContent() {
 
   return (
     <>
-      {/* ══ Atmospheric fog — soft depth haze ══ */}
       <fog attach="fog" args={[fogColor, fogNear, fogFar]} />
 
-      {/* ══ Dynamic lighting system ══ */}
-
-      {/* Ambient fill — responds to time of day */}
       <ambientLight intensity={ambient.intensity * 0.62} color={fogColor} />
-
-      {/* Hemisphere sky/ground bounce */}
       <hemisphereLight args={[fogColor, groundColor, 0.28 + ambient.intensity * 0.16]} />
-
-      {/* Dynamic sun (directional light) — comes from exterior side, casts window frame shadows */}
       <SunLight />
 
-      {/* Sky fill — soft diffuse daylight entering through the window wall.
-           Simulates the cool, even light from the sky seen through glass.
-           Does not cast shadows — it's pure ambient contribution. */}
       {sun.enabled && sun.timeOfDay >= 6 && sun.timeOfDay < 20 && (
         <directionalLight
           position={[0, room.height * 0.8, -room.length * 0.5 - 0.5]}
@@ -117,7 +102,6 @@ function SceneContent() {
         />
       )}
 
-      {/* Sun punch — warmer direct hit so the scene stays sunny through haze */}
       {sun.enabled && sun.timeOfDay >= 7 && sun.timeOfDay < 18.5 && (
         <directionalLight
           position={[room.width * 0.35, room.height * 2.2, -room.length * 1.8]}
@@ -127,10 +111,7 @@ function SceneContent() {
         />
       )}
 
-      {/* User-placed indoor lamps */}
       <RoomLights />
-
-      {/* Subtle constant fill so the scene is never completely black */}
       <pointLight position={[0, 3, 0]} intensity={0.04} color="#fef5ec" distance={12} decay={2} />
       <OrbitControls
         ref={controlsRef}
@@ -145,10 +126,8 @@ function SceneContent() {
         zoomSpeed={1.1}
       />
 
-      {/* ── Grid: architectural blueprint grid in 2D, faint helper in 3D ── */}
       {viewMode === "2d" ? (
         <group>
-          {/* Primary metric grid — 1 m sections, 0.5 m cells */}
           <Grid
             args={[room.width, room.length]}
             position={[0, 0.006, 0]}
@@ -162,7 +141,6 @@ function SceneContent() {
             fadeStrength={1.5}
             infiniteGrid={false}
           />
-          {/* Subtle secondary grid for fine measurement — 0.1 m */}
           <Grid
             args={[room.width, room.length]}
             position={[0, 0.004, 0]}
@@ -178,7 +156,6 @@ function SceneContent() {
           />
         </group>
       ) : (
-        /* 3D mode: very faint 1 m grid on the floor */
         <Grid
           args={[room.width, room.length]}
           position={[0, 0.003, 0]}
@@ -194,7 +171,6 @@ function SceneContent() {
         />
       )}
 
-      {/* English building shell + street — 3D mode only */}
       {viewMode === "3d" && (
         <>
           <BuildingShell />
@@ -202,15 +178,12 @@ function SceneContent() {
         </>
       )}
 
-      {/* Room geometry */}
       <Room />
 
-      {/* Furniture items */}
       {furniture.map((item) => (
         <Furniture key={item.id} item={item} />
       ))}
 
-      {/* Contact shadows — soft ambient occlusion on the floor */}
       <ContactShadows
         position={[0, 0.002, 0]}
         width={room.width}
@@ -226,12 +199,12 @@ function SceneContent() {
 }
 
 export default function Scene3D() {
-  const viewMode        = useRoomStore((s) => s.viewMode);
+  const viewMode = useRoomStore((s) => s.viewMode);
   const selectFurniture = useRoomStore((s) => s.selectFurniture);
-  const selectWall      = useRoomStore((s) => s.selectWall);
-  const room            = useRoomStore((s) => s.room);
-  const sunTime         = useLightingStore((s) => s.sun.timeOfDay);
-  const bg              = useMemo(() => getSceneBackground(sunTime), [sunTime]);
+  const selectWall = useRoomStore((s) => s.selectWall);
+  const room = useRoomStore((s) => s.room);
+  const sunTime = useLightingStore((s) => s.sun.timeOfDay);
+  const bg = useMemo(() => getSceneBackground(sunTime), [sunTime]);
 
   return (
     <Canvas
