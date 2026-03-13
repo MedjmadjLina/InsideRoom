@@ -11,7 +11,11 @@ import { useLightingStore, getSunColor, getSunPosition } from "@/store/lightingS
 import { useRoomStore } from "@/store/roomStore";
 import * as THREE from "three";
 
-export default function SunLight() {
+interface SunLightProps {
+  reducedDetail?: boolean;
+}
+
+export default function SunLight({ reducedDetail = false }: SunLightProps) {
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const targetRef = useRef(new THREE.Vector3(0, 0, 0));
 
@@ -23,6 +27,8 @@ export default function SunLight() {
   const position = useMemo(() => getSunPosition(sun.timeOfDay), [sun.timeOfDay]);
   const intensity = sun.intensity;
   const enabled = sun.enabled;
+  const shadowMapSize = reducedDetail ? 1024 : 1536;
+  const shadowFar = reducedDetail ? 42 : 50;
 
   // Shadow camera frustum larger than room so frames outside FOV still cast
   const frustum = useMemo(() => {
@@ -47,12 +53,12 @@ export default function SunLight() {
         intensity={intensity}
         color={color}
         castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={shadowMapSize}
+        shadow-mapSize-height={shadowMapSize}
         shadow-bias={-0.00008}
         shadow-normalBias={0.02}
         shadow-camera-near={0.1}
-        shadow-camera-far={50}
+        shadow-camera-far={shadowFar}
         shadow-camera-left={frustum.left}
         shadow-camera-right={frustum.right}
         shadow-camera-top={frustum.top}

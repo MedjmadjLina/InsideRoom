@@ -26,6 +26,7 @@ function SceneContent() {
   const apartmentType = useRoomStore((s) => s.apartmentType);
   const activeLevel = useRoomStore((s) => s.activeLevel);
   const furniture = useRoomStore((s) => s.furniture);
+  const walls = useRoomStore((s) => s.walls);
   const viewMode = useRoomStore((s) => s.viewMode);
   const room = useRoomStore((s) => s.room);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -63,10 +64,15 @@ function SceneContent() {
     const t = sun.timeOfDay;
     return (t >= 7 && t < 18) ? 72 : 46;
   }, [sun.timeOfDay]);
+  const reducedDetail = useMemo(() => {
+    const footprintWeight = Math.round((room.width * room.length) / 10);
+    const sceneComplexity = furniture.length + walls.length + footprintWeight + (apartmentType === "duplex" ? 6 : 0);
+    return viewMode === "3d" && sceneComplexity >= 20;
+  }, [apartmentType, furniture.length, room.length, room.width, viewMode, walls.length]);
 
   useEffect(() => {
     cameraReady.current = false;
-  }, [viewMode, room]);
+  }, [viewMode, room, reducedDetail]);
 
   useFrame(() => {
     if (cameraReady.current || !controlsRef.current) return;
@@ -104,7 +110,7 @@ function SceneContent() {
 
       <ambientLight intensity={ambient.intensity * 0.62} color={fogColor} />
       <hemisphereLight args={[fogColor, groundColor, 0.28 + ambient.intensity * 0.16]} />
-      <SunLight />
+      <SunLight reducedDetail={reducedDetail} />
 
       {sun.enabled && sun.timeOfDay >= 6 && sun.timeOfDay < 20 && (
         <directionalLight
@@ -187,7 +193,7 @@ function SceneContent() {
       {viewMode === "3d" && (
         <>
           <BuildingShell />
-          <EnglishStreetView />
+          <EnglishStreetView reducedDetail={reducedDetail} />
         </>
       )}
 
@@ -199,16 +205,20 @@ function SceneContent() {
         <Furniture key={item.id} item={item} />
       ))}
 
-      <ContactShadows
-        position={[0, 0.002, 0]}
-        width={room.width}
-        height={room.length}
-        far={room.height + 1}
-        opacity={Math.max(0.20, Math.min(0.50, 0.22 + ambient.intensity * 0.55))}
-        blur={2.2}
-        resolution={768}
-        color="#1a1510"
-      />
+      {viewMode === "3d" && (
+        <ContactShadows
+          position={[0, 0.002, 0]}
+          width={room.width}
+          height={room.length}
+          far={room.height + 1}
+          opacity={reducedDetail
+            ? Math.max(0.14, Math.min(0.34, 0.18 + ambient.intensity * 0.38))
+            : Math.max(0.20, Math.min(0.50, 0.22 + ambient.intensity * 0.55))}
+          blur={reducedDetail ? 1.6 : 2.2}
+          resolution={reducedDetail ? 384 : 768}
+          color="#1a1510"
+        />
+      )}
     </>
   );
 }
@@ -218,11 +228,20 @@ export default function Scene3D() {
   const selectFurniture = useRoomStore((s) => s.selectFurniture);
   const selectWall = useRoomStore((s) => s.selectWall);
   const room = useRoomStore((s) => s.room);
+  const furnitureCount = useRoomStore((s) => s.furniture.length);
+  const wallCount = useRoomStore((s) => s.walls.length);
+  const apartmentType = useRoomStore((s) => s.apartmentType);
   const sunTime = useLightingStore((s) => s.sun.timeOfDay);
   const bg = useMemo(() => getSceneBackground(sunTime), [sunTime]);
+  const reducedDetail = useMemo(() => {
+    const footprintWeight = Math.round((room.width * room.length) / 10);
+    const sceneComplexity = furnitureCount + wallCount + footprintWeight + (apartmentType === "duplex" ? 6 : 0);
+    return viewMode === "3d" && sceneComplexity >= 20;
+  }, [apartmentType, furnitureCount, room.length, room.width, viewMode, wallCount]);
 
   return (
     <Canvas
+      dpr={viewMode === "2d" ? [1, 1.15] : reducedDetail ? [1, 1.35] : [1, 1.7]}
       shadows={{ type: THREE.PCFSoftShadowMap }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       camera={{
